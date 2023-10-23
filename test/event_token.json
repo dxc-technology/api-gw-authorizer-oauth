@@ -1,0 +1,5 @@
+{
+    "type":"TOKEN",
+    "authorizationToken":"{caller-supplied-token}",
+    "methodArn":"arn:aws:execute-api:eu-south-2:012345678901:test-api/test/GET/testresource"
+}

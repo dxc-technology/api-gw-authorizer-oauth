@@ -1,0 +1,4 @@
+pyjwt[crypto]==2.8.0
+boto3==1.26.90
+configobj==5.0.8
+requests==2.24.0

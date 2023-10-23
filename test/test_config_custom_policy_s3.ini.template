@@ -1,0 +1,22 @@
+[AzureAD]
+ClientID=<<APP ID>>
+TenantID=<<TENANT ID>>
+ClientSecret=<<SECRET>>
+Scope=api://<<APP ID>>/<<SCOPE>>
+
+[LAMBDA]
+Issuer=https://sts.windows.net/<<TENANT ID>>/
+Audience=api://<<APP ID>>
+UserIdClaim=email
+JwksUrl=https://login.microsoftonline.com/<<TENANT ID>>/discovery/keys?appid=<<APP ID>>
+RequiredClaims='iss','exp','aud','sub','appid','iat','uti','nbf'
+
+[LOGGING]
+Level=DEBUG
+
+[POLICY_CUSTOM]
+PolicyFactoryPackage=policy_factory_layer
+PolicyFactoryModule=template_policy_factory
+PolicyFactoryClass=TemplatePolicyFactory
+TEMPLATE_S3=s3://lz-sbx-automation-eu-central-1/allow1.j2
+

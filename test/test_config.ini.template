@@ -1,0 +1,23 @@
+[LAMBDA]
+Issuer=https://sts.windows.net/{{Tenant ID}}/
+Audience=api://{{Application ID}}
+UserIdClaim=email
+JwksUrl=https://login.microsoftonline.com/{{Tenant ID}}/discovery/keys?appid={{Application ID}}
+RequiredClaims='iss','exp','aud','sub','appid','iat','uti','nbf'
+RequiredScopes=default
+
+[DynamoDBCache]
+Table=jwkscache
+LifeSeconds=300
+
+[LOGGING]
+Level=DEBUG
+
+[POLICY_CUSTOM]
+PolicyFactoryPackage=policy_factory_layer
+PolicyFactoryModule=template_policy_factory
+PolicyFactoryClass=TemplatePolicyFactory
+PolicyFactoryTemplateDirectory=templates
+PolicyFactoryTemplateFile=groups.j2
+Admin_Groups={{OID of the Administrtors Group}}
+User_Groups={{OID of the Users Group}}

@@ -1,0 +1,188 @@
+{
+  "Description" : "(v@VERSION@) API Gateway Authorizer Lambda, Local Cache and Policy Customization layers",
+  "Parameters" : {
+    "CodeS3Url": {
+      "Type": "String",
+      "Description" : "NO TRAILING / AND NOT ROOT PATH. URL to the S3 location where ZIPs are."
+    },
+    "CONFIGS3": {
+      "Type" : "String",
+      "Description" : "URI of the S3 object to get the configuration from"
+    },
+    "CONFIGSSM": {
+      "Type" : "String",
+      "Description" : "Name of the SSM parameter providing the configuration"
+    },
+    "LambdaName": {
+      "Type" : "String",
+      "Description" : "Name given to the AWS Lambda function and root for the layer names"
+    }
+  },
+  "Mappings" : {
+	  "Constants" : {
+          "LambdasZIPObjectKey":	{"Value": "@S3_OBJECT_LAMBDA@"},
+          "ExtensionZIPObjectKey":	{"Value": "@S3_OBJECT_EXTENSION@"},
+	      "LambdaHandler": 			{"Value": "apigwauth.authlambda.handler"},
+          "LambdaDescription":		{"Value": "(v@VERSION@) Authorizer lamda with OAuth token validation"}
+	  }
+  },
+  "Conditions" : {
+    "SSM": {"Fn::Not" : [{"Fn::Equals":[{"Ref":"CONFIGSSM"},""]}]}
+  },
+  "Resources" : {
+    "LambdaRole" : {
+      "Type" : "AWS::IAM::Role",
+      "Properties" : {
+        "Path" : "/",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{ 
+            	"Effect": "Allow", 
+            	"Principal": {"Service": ["lambda.amazonaws.com"]},
+             	"Action": ["sts:AssumeRole"] 
+          }]
+        },
+        "Policies" : [
+			{
+			  "PolicyName": "CloudWatchLogs",
+     		  "PolicyDocument": {
+           		  "Version": "2012-10-17",
+				  "Statement": [
+				    {
+                      "Sid":"CloudWatchLogGroup",
+				      "Effect": "Allow",
+				      "Action": [
+				        "logs:CreateLogGroup"
+				      ],
+		              "Resource": "*"
+				    },
+				    {
+          			  "Sid": "CloudWatchLogs",
+				      "Effect": "Allow",
+				      "Action": [
+				        "logs:CreateLogStream",
+				        "logs:PutLogEvents"
+				      ],
+		              "Resource": {"Fn::Sub": ["arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${LambdaName}*",
+	                 	{
+                      	  "LambdaName": {"Ref":"LambdaName"}
+	                    }]
+	                 }
+				    }
+      		      ]
+        		}
+       		},
+       		{
+           	  "PolicyName": "DynamoDBCacheTable",
+              "PolicyDocument": {
+           		  "Version": "2012-10-17",
+                  "Statement": [{
+	                "Effect": "Allow",
+	          	    "Action": [
+                	  "dynamodb:*"
+	                ],
+	                "Resource": {"Fn::Sub": "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:*"}
+                  }]
+      		  }
+            },
+       		{
+           	  "PolicyName": "SsmConfigRead",
+              "PolicyDocument": {
+           		  "Version": "2012-10-17",
+                  "Statement": [{
+                    "Sid": "",
+	                "Effect": "Allow",
+	          	    "Action": [
+                	  "ssm:GetParameter",
+                	  "ssm:GetParameters"
+	                ],
+	                "Resource": {"Fn::Sub":"arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*"}
+                  }]
+      		  }
+            },
+       		{
+           	  "PolicyName": "S3ConfigRead",
+              "PolicyDocument": {
+           		  "Version": "2012-10-17",
+                  "Statement": [{
+                    "Sid": "",
+	                "Effect": "Allow",
+	          	    "Action": [
+                	  "s3:GetObject",
+                	  "s3:ListObjects"
+	                ],
+	                "Resource": "*"
+                  }]
+      		  }
+            }
+		]
+      }
+    },
+    "CacheExtensionLayer" : {
+      "Type" : "AWS::Lambda::LayerVersion",
+      "Properties" : {
+        "LayerName" : {"Fn::Sub":"${LambdaName}-cache-extension"},
+        "CompatibleArchitectures" : ["arm64","x86_64"],
+        "Content" : {
+          "S3Bucket" : {"Fn::Select":["1",{"Fn::Split":["https://",{"Fn::Select":["0",{"Fn::Split":[".s3",{"Ref":"CodeS3Url"}]}]}]}]},
+          "S3Key" : {"Fn::Sub":["${path}/${file}",{
+            "path": {"Fn::Select":["1",{"Fn::Split":[".amazonaws.com/",{"Ref":"CodeS3Url"}]}]},
+            "file": {"Fn::FindInMap":["Constants","ExtensionZIPObjectKey","Value"]}
+          }]}
+        },
+        "Description" : "(v@VERSION@) API Gateway Authorizer lambda Cache Extension layer",
+        "CompatibleRuntimes" : ["python3.8"],
+        "LicenseInfo" : "MIT"
+      }
+    },
+    "Lambda" : {
+      "Type" : "AWS::Lambda::Function",
+      "Properties" : {
+        "Description" : {"Fn::FindInMap":["Constants","LambdaDescription","Value"]},
+        "FunctionName" : {"Ref":"LambdaName"},
+        "Handler" : {"Fn::FindInMap": ["Constants","LambdaHandler","Value"]},
+        "Code" : {
+          "S3Bucket" : {"Fn::Select":["1",{"Fn::Split":["https://",{"Fn::Select":["0",{"Fn::Split":[".s3",{"Ref":"CodeS3Url"}]}]}]}]},
+          "S3Key" : {"Fn::Sub":["${path}/${file}",{
+            "path": {"Fn::Select":["1",{"Fn::Split":[".amazonaws.com/",{"Ref":"CodeS3Url"}]}]},
+            "file": {"Fn::FindInMap":["Constants","LambdasZIPObjectKey","Value"]}
+          }]}
+        },
+        "Layers" : [
+          {"Ref":"CacheExtensionLayer"}
+        ],
+        "Environment" : {"Fn::If":["SSM",
+          {
+            "Variables" : {
+               "LOG_LEVEL" : "INFO",
+               "CONFIG_SSM" : {"Ref":"CONFIGSSM"}
+            }
+          },
+          {
+            "Variables" : {
+               "LOG_LEVEL" : "INFO",
+               "CONFIG_S3" : {"Ref":"CONFIGS3"}
+            }
+          }
+        ]},
+        "Runtime" : "python3.8",
+        "Timeout" : "10",
+        "MemorySize" : "512",
+        "Role" : {"Fn::GetAtt": ["LambdaRole","Arn"]},
+		"Tags" : [  { "Key" : "Name", "Value" : {"Ref":"LambdaName"} }]
+      }
+    }
+   },
+   "Outputs" : {
+     "LambdaRoleArn" : {
+       "Description" : "ARN of the role used by the Lambda",
+       "Export" : {"Name":{"Fn::Sub": "${LambdaName}-LambdaRoleArn"}},
+       "Value" : {"Fn::GetAtt" : ["LambdaRole","Arn"]}
+     },
+     "LambdaArn" : {
+       "Description" : "ARN of the Lambda",
+       "Export" : {"Name":{"Fn::Sub": "${LambdaName}-LambdaArn"}},
+       "Value" : {"Fn::GetAtt" : ["Lambda","Arn"]}
+     }
+   }
+}

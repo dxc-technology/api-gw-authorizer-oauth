@@ -1,0 +1,18 @@
+{
+  "principalId": "{{ token.sub }}",
+  "policyDocument": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Allow",
+        "Resource": "{{ event.methodArn }}"
+      }
+    ]
+  },
+  "context": {
+    "userId": "{{ token.email }}",
+    "groups": "{{ token.groups | join(',') }}",
+    "static": "S3 Test"
+  }
+}

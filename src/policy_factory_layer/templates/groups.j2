@@ -1,0 +1,40 @@
+{%- set re = import_module('re') %}
+{
+  "principalId": "{{ token.sub }}",
+  "policyDocument": {
+    "Version": "2012-10-17",
+    "Statement": [
+{%- set ns = namespace(comma='') %}
+{%- for grp in token.groups %}
+  {{ ns.comma }}
+  {%- if grp in config['POLICY_CUSTOM'].get('Admin_Groups','') %}
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Allow",
+        "Resource": "*"
+      }
+    {%- set ns.comma = ',' %}
+  {%- elif grp in config['POLICY_CUSTOM'].get('User_Groups','') %}
+    {%- set arn_parts = re.match('^arn:aws:execute-api:(\w+(?:-\w+)+):(\d{12}):([^/\b]+)/([^/\b]+)/([^/\b]+)/(.*)$',event.methodArn).groups() %}
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Allow",
+        "Resource": "arn:aws:execute-api:{{ arn_parts[0] }}:{{ arn_parts[1] }}:{{ arn_parts[2] }}/{{ arn_parts[3] }}/*"
+      }
+    {%- set ns.comma = ',' %}
+  {%- endif %}
+{%- endfor %}
+{% if ns.comma is sameas '' %}
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Deny",
+        "Resource": "*"
+      }
+{% endif %}
+    ]
+  },
+  "context": {
+    "userId": "{{ token.email }}",
+    "groups": "{{ token.groups | join(',') }}"
+  }
+}

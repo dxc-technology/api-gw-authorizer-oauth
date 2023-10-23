@@ -1,0 +1,24 @@
+[AzureAD]
+ClientID=<<APP ID>>
+TenantID=<<TENANT ID>>
+ClientSecret=<<SECRET>>
+Scope=api://<<APP ID>>/<<SCOPE>>
+
+[LAMBDA]
+Issuer=https://sts.windows.net/<<TENANT ID>>/
+Audience=api://<<APP ID>>
+UserIdClaim=email
+JwksUrl=https://login.microsoftonline.com/<<TENANT ID>>/discovery/keys?appid=<<APP ID>>
+RequiredClaims='iss','exp','aud','sub','appid','iat','uti','nbf'
+
+[LOGGING]
+Level=DEBUG
+
+[POLICY_CUSTOM]
+PolicyFactoryPackage=policy_factory_layer
+PolicyFactoryModule=template_policy_factory
+PolicyFactoryClass=TemplatePolicyFactory
+PolicyFactoryTemplateDirectory=templates
+PolicyFactoryTemplateFile=groups.j2
+Admin_Groups=d989b5f9-4eb2-45a4-b94f-9494200ee2bd
+User_Groups=18c75b32-dc4d-4f40-9256-9fd90e628609
